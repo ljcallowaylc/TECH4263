@@ -1,4 +1,4 @@
-
+using EquipmentAPI.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
@@ -13,37 +13,60 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseAuthorization();
+
 
 
 List<Equipment> equipments = new();
 
-
-app.MapPost("/createequipment", (string name, string category, string status, string location) =>
+app.MapPost("/equipments", (CreateEquipmentDto dto) =>
 {
-    if (string.IsNullOrWhiteSpace(name))
-        return Results.BadRequest("Name is required.");
+    var equipment = new Equipment(dto.Name, dto.Category, dto.Status, dto.Location);
 
-    Equipment equipment = new Equipment(name, category, status, location);
     equipments.Add(equipment);
 
-    return Results.Created($"/getequipment/{equipment.Id}", equipment);
-}).WithName("CreateEquipment");
+    return Results.Created($"/equipments/{equipment.Id}", new EquipmentResponseDto
+    {
+        Id = equipment.Id,
+        Name = equipment.Name,
+        Category = equipment.Category,
+        Status = equipment.Status
+    });
+})
+.WithName("CreateEquipment")
+.WithOpenApi();
 
-app.MapGet("/getequipments", () =>
+app.MapGet("/equipments", () =>
 {
-    return Results.Ok(equipments);
-}).WithName("GetEquipments");
+    var result = equipments.Select(e => new EquipmentResponseDto
+    {
+        Id = e.Id,
+        Name = e.Name,
+        Category = e.Category,
+        Status = e.Status
+    });
 
-app.MapGet("/getequipment/{id}", (int id) =>
+    return Results.Ok(result);
+})
+.WithName("GetEquipments")
+.WithOpenApi();
+
+app.MapGet("/equipments/{id:int:min(1)}", (int id) =>
 {
     var equipment = equipments.FirstOrDefault(e => e.Id == id);
 
-    if (equipment is null)
-        return Results.NotFound($"Equipment with Id {id} not found.");
+    if (equipment == null)
+        return Results.NotFound();
 
-    return Results.Ok(equipment);
-}).WithName("GetEquipmentById");
+    return Results.Ok(new EquipmentResponseDto
+    {
+        Id = equipment.Id,
+        Name = equipment.Name,
+        Category = equipment.Category,
+        Status = equipment.Status
+    });
+})
+.WithName("GetEquipmentById")
+.WithOpenApi();
 
 
 
