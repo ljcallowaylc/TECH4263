@@ -1,10 +1,16 @@
 using StudentAPI.Models;
+using Microsoft.EntityFrameworkCore;
+//using StudentAPI.Data;
+
 var builder = WebApplication.CreateBuilder(args);
+
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var app = builder.Build();
 
@@ -17,54 +23,55 @@ if (app.Environment.IsDevelopment())
 
 //app.UseHttpsRedirection();
 
-var students = new List<Student>(); // In-memory list to store students for demo purposes
 
-app.MapPost("/students", (CreateStudentDto dto) =>
+//var students = new List<Student>(); // In-memory list to store students for demo purposes
+
+
+
+
+
+
+// --------------------
+// POST /students
+// --------------------
+app.MapPost("/students", async (AppDbContext context, Student student) =>
 {
-    var student = new Student(dto.Name, dto.Age, dto.Major);
-    students.Add(student);
-
-    return Results.Created($"/students/{student.Id}", new StudentResponseDto
-    {
-        Id = student.Id,
-        Name = student.Name,
-        Major = student.Major
-    });
+    context.Students.Add(student);              // Add new student
+    await context.SaveChangesAsync();           // Save to DB
+    return Results.Created($"/students/{student.Id}", student);  // Return 201 with student info
 })
 .WithName("CreateStudent")
 .WithOpenApi();
 
-app.MapGet("/students", () =>
+// --------------------
+// GET /students
+// --------------------
+app.MapGet("/students", async (AppDbContext context) =>
 {
-    var result = students.Select(s => new StudentResponseDto
-    {
-        Id = s.Id,
-        Name = s.Name,
-        Major = s.Major
-    });
-
-    return Results.Ok(result);
+    var students = await context.Students.ToListAsync(); // Get all students
+    return Results.Ok(students);
 })
-.WithName("GetStudents")
+.WithName("GetAllStudents")
 .WithOpenApi();
 
-app.MapGet("/students/{id:int:min(1)}", (int id) =>
+// --------------------
+// GET /students/{id}
+// --------------------
+app.MapGet("/students/{id:int}", async (AppDbContext context, int id) =>
 {
-    var student = students.FirstOrDefault(s => s.Id == id);
-
-    if (student == null)
-        return Results.NotFound();
-
-    return Results.Ok(new StudentResponseDto
-    {
-        Id = student.Id,
-        Name = student.Name,
-        Major = student.Major
-    });
+    var student = await context.Students.FindAsync(id); // Find student by Id
+    return student is not null ? Results.Ok(student) : Results.NotFound();
 })
 .WithName("GetStudentById")
 .WithOpenApi();
 
 app.Run();
 
+
+public class AppDbContext : DbContext
+{
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+
+    public DbSet<Student> Students { get; set; }
+}
 
